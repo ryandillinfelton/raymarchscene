@@ -30,6 +30,8 @@ float rand(vec2 co){
     return fract(sin(dot(co.xy ,vec2(12.9898,78.233))) * 43758.5453);
 }
 
+//just testing git
+
 /*
 	Checks if the point is inside or outside of
 	a unit sphere centered at the origin
