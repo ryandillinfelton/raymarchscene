@@ -1,10 +1,10 @@
 /*
-   Author: R. Felton
+   Author: R. Felton and M. Olker
    Date: 1/17/17
    Class: CSC3360
 */
 
-var triangleVertexPositionBuffer; 
+var triangleVertexPositionBuffer;
 
 var mouseX;
 var mouseY;
@@ -19,7 +19,7 @@ function mouseMove(event)
 //===================================================================
 //initialzes the buffers and adds the coordinates of the verts of the
 //triangle
-function initBuffers(gl,program) 
+function initBuffers(gl,program)
 {
    var triangle = new Float32Array([-1.0,-1.0,0.0,
                                     1.0,1.0,0.0,
@@ -59,8 +59,8 @@ function render(gl,program)
    console.log("render func done");
 }
 
-//main driving function that runs when the body of the HTML is loaded 
-function webGLStart() 
+//main driving function that runs when the body of the HTML is loaded
+function webGLStart()
 {
    var canvas = document.getElementById("gl-canvas");
    var gl;
