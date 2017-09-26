@@ -4,7 +4,7 @@ precision mediump float;
 
 const int MAX_MARCHING_STEPS = 255;
 const float MIN_DIST = 0.0;
-const float MAX_DIST = 200.0;
+const float MAX_DIST = 150.0;
 const float EPSILON = 0.0001;
 
 uniform vec2 u_resolution;
@@ -27,11 +27,7 @@ struct rayCast {
 } ray;
 
 //global background color declaration
-vec3 background = vec3(0.0,0.0,0.0);
-
-float rand(vec2 co){
-    return fract(sin(dot(co.xy ,vec2(12.9898,78.233))) * 43758.5453);
-}
+vec3 background = vec3(0.8,0.8,0.9);
 
 /*
     Checks if the point is inside or outside of
@@ -61,6 +57,15 @@ float sdTorus( vec3 p, vec2 t )
   return length(q)-t.y;
 }
 
+float opTwistTorus( vec3 p )
+{
+    float c = cos(10.0*p.y);
+    float s = sin(10.0*p.y);
+    mat2  m = mat2(c,-s,s,c);
+    vec3  q = vec3(m*p.xz,p.y);
+    return sdTorus(q , vec2(1.0,0.25));
+}
+
 float smin( float a, float b, float k )
 {
     float h = clamp( 0.5+0.5*(b-a)/k, 0.0, 1.0 );
@@ -69,22 +74,24 @@ float smin( float a, float b, float k )
 
 float smoothUnion( float d1, float d2 )
 {
-    return smin(d1,d2, 0.3);
+    return min(d1,d2);
 }
 
 float sceneSDF(vec3 pt) {
 
     float floor = sdBox(pt-vec3(0,-1.5,0), vec3(30,0.0,20.0));
     float sphere = sdSphere(pt-vec3(0.0,1.0,-.0), 1.0);
-    float mirrorSphere = sdSphere(pt-vec3(2.811,1.403,-4.971), 2.0);
+    float mirrorSphere = sdSphere(pt-vec3(2.811,1.0,-3.0), 2.0);
     float mirrorCube = sdBox(pt-vec3(-1.2,0.869,-1.712), vec3(1.0,1.0,1.0));
-    float mirrorTorus = sdTorus(pt-vec3(0,0.5,0),vec2(15.0,1.0));
+    float mirrorTorus = sdTorus(pt-vec3(0,0.5,0.0),vec2(12.0,1.5));
+    float twistTorus = opTwistTorus(pt- vec3(-1.5,0.5,-4.0));
 
-    float value = smoothUnion(smoothUnion(floor, sphere),smoothUnion(mirrorTorus, mirrorSphere));
+
+    float value = smoothUnion(smoothUnion(smoothUnion(floor, sphere),smoothUnion(mirrorTorus, mirrorSphere)),twistTorus);
 
     if(value == floor) {
         ray.hit = 0;
-    } else if (value == sphere) {
+    } else if (value == sphere || value == twistTorus) {
         ray.hit = 1;
     } else if (value == mirrorSphere || value == mirrorTorus) {
         ray.hit = 2;
@@ -215,40 +222,33 @@ vec3 lighting(vec3 pt, vec3 eye, light currentLight) {
 }
 
 vec3 mirror(vec3 pt, vec3 eye, light currentLight) {
-    vec3 objectColor;
-    vec3 normal = estimateNormal(pt);
-    vec3 mirrorColor = vec3(0.2);
+    vec3 objectColor, normal, v, reflectedV;
+    float dist, noHit;
+    vec3 mirrorColor = vec3(0.1);
 
-
-    vec3 v = normalize(eye - pt);
-    vec3 reflectedV = reflect(-v, normal);
-    float dist = shortestDistanceToSurface(pt, reflectedV, MIN_DIST + 0.01, MAX_DIST);
-
-    vec3 newPt = pt + (normalize(reflectedV) * dist);
-
-    const int numBounces = 3;
+    const int numBounces = 2;
     for (int i = 0; i < numBounces; i ++) {
-        normal = estimateNormal(newPt);
-        v = normalize(eye - newPt);
-        reflectedV = reflect(-v, normal);
-        dist = shortestDistanceToSurface(newPt, reflectedV, MIN_DIST + 0.01, MAX_DIST);
-        float noHit = step(dist, MAX_DIST - EPSILON);
+        normal = estimateNormal(pt);
+        v = normalize(eye - pt);
+        reflectedV = normalize(reflect(-v, normal));
+        dist = shortestDistanceToSurface(pt, reflectedV, MIN_DIST + 0.01, MAX_DIST);
+        noHit = step(dist, MAX_DIST - EPSILON);
 
-        newPt = newPt + (normalize(reflectedV) * dist);
-        if(ray.hit == 0 || ray.hit == 1){
-            objectColor = lighting(newPt, reflectedV, currentLight);
+        pt = pt + (normalize(reflectedV) * dist);
+        if(ray.hit == 0 || ray.hit == 1) {
+            objectColor = lighting(pt, reflectedV, currentLight);
             break;
         }
     }
 
-    return objectColor + mirrorColor;
+    return ((1.0-noHit) * background) + (noHit * (objectColor + mirrorColor));
 }
 
 vec3 lightingStyle(vec3 pt, vec3 eye, light currentLight) {
     vec3 color;
     if (ray.hit == 0 || ray.hit == 1) {
         color = lighting(pt, eye, currentLight);
-    } else {
+    } else if (ray.hit == 2) {
         color = mirror(pt, eye, currentLight);
     }
 
