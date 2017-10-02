@@ -9,6 +9,12 @@ var triangleVertexPositionBuffer;
 var mouseX;
 var mouseY;
 
+var locationOfU_time;
+var timeLoad;
+
+var gl;
+var program;
+
 function mouseMove(event)
 {
     //console.log("mouseMove");
@@ -41,9 +47,14 @@ function initBuffers(gl,program)
 
 //==================================================================
 //Function to draw the triangle from the buffer
-function render(gl,program)
+function render()
 {
    gl.clear(gl.COLOR_BUFFER_BIT);
+
+   //update u_time
+   var updateTimeVal = (performance.now() - timeLoad)/1000;
+   gl.uniform1f(locationOfU_time, updateTimeVal);
+
 
    //Associate our shader variables with our data buffer
    gl.bindBuffer(gl.ARRAY_BUFFER,triangleVertexPositionBuffer);
@@ -56,14 +67,15 @@ function render(gl,program)
 
    gl.disableVertexAttribArray(vPosition);
    gl.bindBuffer(gl.ARRAY_BUFFER,null);
-   console.log("render func done");
+   //console.log("render func done");
+   window.requestAnimationFrame(render);
 }
 
 //main driving function that runs when the body of the HTML is loaded
 function webGLStart()
 {
    var canvas = document.getElementById("gl-canvas");
-   var gl;
+
 
 
    //
@@ -78,24 +90,27 @@ function webGLStart()
       gl.enable(gl.DEPTH_TEST);
 
       //Load shaders
-      var program = initShaders(gl);
+      program = initShaders(gl);
       gl.useProgram(program);
+
+      //compute u_time
+      timeLoad = performance.now();
 
       //pass values to uniforms
       var locationOfU_resolition = gl.getUniformLocation(program, "u_resolution");
       var locationOfU_mouse = gl.getUniformLocation(program, "u_mouse");
-      var locationOfU_time = gl.getUniformLocation(program, "u_time");
+      locationOfU_time = gl.getUniformLocation(program, "u_time");
 
       gl.uniform2f(locationOfU_resolition, gl.viewportWidth, gl.viewportHeight);
       gl.uniform2f(locationOfU_mouse, mouseX, mouseY);
-      //gl.uniform1f(locationOfU_time, valueToPass);
+      //gl.uniform1f(locationOfU_time, 0);
 
 
       //load the data into the GPU, i.e. initialize buffers
       initBuffers(gl,program);
 
-      console.log("rendering");
-      render(gl,program);
+      //render(gl,program);
+      window.requestAnimationFrame(render);
    } else {
       alert("Failed to initialize webGL in browser - exiting!");
    }
