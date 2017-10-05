@@ -24,7 +24,7 @@ struct light {
 struct rayCast {
     vec3 direction;
     float magnitude;
-    object hit;
+    float hit;
     vec3 hitPoint;
 } ray;
 
@@ -35,24 +35,16 @@ struct primitive {
 };
 
 struct object {
-  vec3 position;
-  vec3 dimensions;
-  vec2 radii;
-  float size;
+  float hit;
   vec3 ambientColor;
   vec3 diffuseColor;
   vec3 specularColor;
-  float hit;
 
-  object(vec3 pos,vec3 dim,vec2 r,float s,vec3 aColor,vec3 dColor,vec3 specColor){
-    position = pos;
-    dimensions = dim;
-    radii = r;
-    size = s;
+  object(float theHit, vec3 aColor,vec3 dColor,vec3 specColor){
+    hit = theHit;
     ambientColor = aColor;
     diffuseColor = dColor;
     specularColor = specColor;
-    hit = EPSILON;
   }
 };
 
@@ -112,31 +104,25 @@ float un(float d1, float d2) {
 }
 
 float sceneSDF(vec3 pt) {
-    object floor = object(pt-vec3(0,-1.7,0),vec3(30,0.0,20.0),vec2(0),0.0,floorCheckerboard(pt),floorCheckerboard(pt),floorCheckerboard(pt));
-    object sphere = object(pt-vec3(sin(u_time),-0.5+(sin(u_time)*0.3),cos(u_time)), vec(0),vec2(0),0.5,vec3(0.630,0.0,0.076), vec3(0.730,0.064,0.176), vec3(0.830,0.164,0.276));
-    object mirrorSphere = object(pt-vec3(2.811,1.0,-3.0),vec3(0),vec2(0),2.0,vec3(0),vec3(0),vec3(0));
-    object mirrorTorus = object(pt-vec3(0,0.5,0.0),vec3(0),vec2(12.0,1.5),0.0,vec3(0),vec3(0),vec3(0));
-    object twistTorus = object(pt- vec3(-1.5,0.5,-4.0),vec3(0),vec2(1.0,0.25),0.0,vec3(0.630,0.0,0.076), vec3(0.730,0.064,0.176), vec3(0.830,0.164,0.276));
-
-    floor.hit = sdBox(floor.position, floor.dimensions);
-    sphere.hit = sdSphere(sphere.position, sphere.size);
-    mirrorSphere.hit = sdSphere(mirrorSphere.position, mirrorSphere.size);
-    mirrorTorus.hit = sdTorus(mirrorTorus.position,mirrorTorus.radii);
-    twistTorus.hit = opTwistTorus(twistTorus.position,twistTorus.radii);
+    object floor = object(sdBox(pt-vec3(0,-1.7,0),vec3(30,0.0,20.0)),floorCheckerboard(pt),floorCheckerboard(pt),floorCheckerboard(pt));
+    object sphere = object(sdSphere(pt-vec3(sin(u_time),-0.5+(sin(u_time)*0.3),cos(u_time)),0.5),vec3(0.630,0.0,0.076), vec3(0.730,0.064,0.176), vec3(0.830,0.164,0.276));
+    object mirrorSphere = object(sdSphere(pt-vec3(2.811,1.0,-3.0),2.0),vec3(0),vec3(0),vec3(0));
+    object mirrorTorus = object(sdTorus(pt-vec3(0,0.5,0.0),vec2(12.0,1.5)),vec3(0),vec3(0),vec3(0));
+    object twistTorus = object(opTwistTorus(pt- vec3(-1.5,0.5,-4.0),vec2(1.0,0.25)),vec3(0.630,0.0,0.076), vec3(0.730,0.064,0.176), vec3(0.830,0.164,0.276));
 
 
     float value = un(un(un(floor.hit, sphere.hit),un(mirrorTorus.hit, mirrorSphere.hit)),twistTorus.hit);
 
     if(value == floor.hit) {
-        ray.hit = floor;
+        ray.hit = floor.hit;
     } else if (value == sphere.hit) {
-        ray.hit = sphere;
+        ray.hit = sphere.hit;
     } else if (value == twistTorus.hit) {
-        ray.hit = twistTorus;
+        ray.hit = twistTorus.hit;
     } else if (value == mirrorSphere.hit ) {
-        ray.hit = mirrorSphere;
+        ray.hit = mirrorSphere.hit;
     } else if (value == mirrorTorus.hit ) {
-        ray.hit = mirrorTorus;
+        ray.hit = mirrorTorus.hit;
     }
 
     return value;// + sdSphere(pt, 1.0);//sdBox(pt, vec3(1.0,-1.0,1.0));// + sphereAtPos(pt, vec3(0.0,2.0,0.0));
@@ -258,9 +244,9 @@ vec3 getObjectColor(vec3 pt) {
     vec3 sphereColor = vec3(0.830,0.164,0.276);
     vec3 floorColor = floorCheckerboard(pt);
     vec3 objectColor;
-    if (ray.hit == floor) {
+    if (ray.hit == floor.hit) {
         objectColor = floor.specularColor;
-    } else if (ray.hit == sphere) {
+    } else if (ray.hit == sphere.hit) {
         objectColor = sphere.specularColor;
     }
 
@@ -283,7 +269,7 @@ vec3 mirror(vec3 pt, vec3 eye, light currentLight, object currObject) {
 
         pt = pt + (normalize(reflectedV) * dist);
         bounces = i;
-        if(ray.hit == floor || ray.hit == sphere || ray.hit == twistTorus) {
+        if(ray.hit == floor.hit || ray.hit == sphere.hit || ray.hit == twistTorus.hit) {
             objectColor = lighting(pt, reflectedV, currentLight, currObject);
             break;
         }
@@ -302,9 +288,9 @@ vec3 lightingStyle(vec3 pt, vec3 eye, light currentLight, object currObject) {
     vec3 objectColor = currObject.specularColor;
 
 
-    if (ray.hit == floor || ray.hit == sphere || ray.hit == twistTorus) {
+    if (ray.hit == floor.hit || ray.hit == sphere.hit || ray.hit == twistTorus.hit) {
         color = lighting(pt, eye, currentLight, currObject);
-    } else if (ray.hit == mirrorTorus || ray.hit == mirrorSphere) {
+    } else if (ray.hit == mirrorTorus.hit || ray.hit == mirrorSphere.hit) {
         color = mirror(pt, eye, currentLight, currObject);
     }
 
@@ -354,7 +340,20 @@ void main() {
     mainlight.ambientColor = vec3(0.3,0.3,0.3);
     mainlight.intensity = 0.8;
 
-    vec3 lightingColor = lightingStyle(pt, eye, mainlight, ray.hit);
+    object currObject;
+    if(ray.hit == floor.hit) {
+        currObject = floor;
+    } else if (ray.hit == sphere.hit) {
+        currObject = sphere;
+    } else if (ray.hit == twistTorus.hit) {
+        currObject = twistTorus;
+    } else if (ray.hit == mirrorSphere.hit ) {
+        currObject = mirrorSphere;
+    } else if (ray.hit == mirrorTorus.hit ) {
+        currObject = mirrorTorus;
+    }
+
+    vec3 lightingColor = lightingStyle(pt, eye, mainlight, currObject);
 
     //the next line finds a vector between the light and the point on the
     //sphere
