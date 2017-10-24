@@ -1,6 +1,10 @@
 #ifdef GL_ES
 precision mediump float;
 #endif
+#ifdef GL_OES_standard_derivatives
+  #extension GL_EXT_shader_texture_lod : enable
+  #extension GL_OES_standard_derivatives : enable
+#endif
 
 const int MAX_MARCHING_STEPS = 255;
 const float MIN_DIST = 0.0;
@@ -10,6 +14,7 @@ const float EPSILON = 0.0001;
 uniform vec2 u_resolution;
 uniform vec2 u_mouse;
 uniform float u_time;
+uniform float keyChar;
 
 const float PI = 3.14159;
 
@@ -74,6 +79,17 @@ float opTwistTorus( vec3 p )
     return sdTorus(q , vec2(1.0,0.25));
 }
 
+float displacement(vec3 p){
+  return sin(10.0*p.x)*sin(10.0*p.y)*sin(10.0*p.z);
+}
+
+float sphereDisplace( vec3 p, float s )
+{
+    float d1 = sdSphere(p, s);
+    float d2 = displacement(p);
+    return d1+d2;
+}
+
 
 float un(float d1, float d2) {
     return min(d1,d2);
@@ -89,13 +105,14 @@ float sceneSDF(vec3 pt) {
     float mirrorCube = sdBox(pt-vec3(-3.5,0.869,-1.712), vec3(1.0,6.0,2.0));
     //float mirrorTorus = sdTorus(pt-vec3(0,0.5,0.0),vec2(12.0,1.5));
     float twistTorus = opTwistTorus(pt- vec3(-1.5,0.5,-4.0));
+    float dispSphere = sphereDisplace(pt - vec3(3.0, 3.0, 3.0), 2.0);
 
 
-    float value = un(un(un(floor, sphere),un(mirrorCube, mirrorSphere)),twistTorus);
+    float value = un(un(un(un(floor, sphere),un(mirrorCube, mirrorSphere)),twistTorus),dispSphere);
 
     if(value == floor) {
         ray.hit = 0;
-    } else if (value == sphere || value == twistTorus ) {
+    } else if (value == sphere || value == twistTorus || value == dispSphere) {
         ray.hit = 1;
     } else if (value == mirrorCube || value == mirrorSphere) {
         ray.hit = 2;
@@ -169,6 +186,11 @@ vec3 specularLighting(vec3 pt, vec3 normal, vec3 eye, light currentLight) {
     return (currentLight.specularColor * currentLight.intensity * pow(rdotV, shinyness));
 }
 
+float filterWidth(vec2 uv) {
+  vec2 fw = max(abs(dFdx(uv)),abs(dFdy(uv)));
+  return max(fw.x, fw.y);
+}
+
 vec3 floorCheckerboard(vec3 pt) {
     vec3 color = vec3(0.981,0.985,0.995);
 
@@ -176,9 +198,17 @@ vec3 floorCheckerboard(vec3 pt) {
     if (tile < 0.0) {
         tile = 1.0;
     }
-
-
     return color * (1.0 - tile);
+}
+
+vec3 floorCheckerboard2(vec2 uv){
+  float width = filterWidth(uv);
+  vec2 p0 = uv - 0.5 * width;
+  vec2 p1 = uv + 0.5 * width;
+  #define BUMPINT(x) (floor((x)/2.0) + 2.0 * max(((x)/2.0) - floor((x)/2.0) - 0.5, 0.0))
+  vec2 i = (BUMPINT(p1) - BUMPINT(p0)) / width;
+  float p = i.x * i.y + (1.0 - i.x) * (1.0 - i.y);
+  return vec3(0.1+ 0.9 * p);
 }
 
 bool shadow(vec3 pt, light currentLight) {
@@ -217,7 +247,8 @@ vec3 lighting(vec3 pt, vec3 eye, light currentLight, vec3 objectColor) {
 
 vec3 getObjectColor(vec3 pt) {
     vec3 sphereColor = vec3(0.830,0.164,0.276);
-    vec3 floorColor = floorCheckerboard(pt);
+    //vec3 floorColor = floorCheckerboard(pt);
+    vec3 floorColor = floorCheckerboard2(vec2(pt.x,pt.z));
     vec3 objectColor;
     if (ray.hit == 0) {
         objectColor = floorColor;
@@ -304,6 +335,33 @@ vec3 lightingStyle(vec3 pt, vec3 eye, light currentLight) {
     return color;
 }
 
+vec3 navigation(vec3 eye){
+  vec3 forward = normalize(center - eye);
+  vec3 orientation = vec3(sin(rotation),cos(rotation), 0.0);
+  vec3 left = normalize(cross(forward,orientation));
+  vec3 up = normalize(cross(left, forward));
+  vec3 right = normalize(cross(up,eye));
+  switch (keyChar) {
+     case 83://S
+         eye = sub(eye, right);
+         initProjection(height, width);
+        break;
+     case 68://D
+         eye = add(eye, right);
+         initProjection(height, width);
+         break;
+     case 87://W
+       eye = add(eye,forward);
+       initProjection(height, width);
+        break;
+     case 65://A
+       eye = add(eye, up);
+       initProjection(height, width);
+         break;
+       }
+    return eye;
+}
+
 //lighting end
 
 //just testing git bruh
@@ -322,13 +380,14 @@ void main() {
     //ray.direction = rayDirection(75.0, u_resolution.xy, gl_FragCoord.xy);
     //vec3 eye = vec3(0,-0.2 + sin(u_time/3.0)*0.5, sin(u_time)*1.0 + 9.0);
 
-    vec3 eye = vec3(0, 3.0, 0.0);
+    vec3 eye = vec3(0, 3.0, 15.0);
     vec3 at = vec3(0,2.7,0);
-    eye.x += 14.7 * sin(u_time * 0.2);
-    eye.z += 14.7 * cos(u_time * 0.2);
+    //eye.x += 14.7 * sin(u_time * 0.2);
+    //eye.z += 14.7 * cos(u_time * 0.2);
     vec2 uv = gl_FragCoord.xy/u_resolution.xy;
     uv = 2.0 * uv - 1.0;
 
+    eye = navigation(eye);
     mat3 toWorld = setCamera(eye, at, 0.0);
     ray.direction = toWorld * normalize(vec3(uv,2.0));
 
@@ -358,6 +417,9 @@ void main() {
 
     //cell shading
     //color = floor(color * 8.0)/8.0;
-
-    gl_FragColor = vec4(color,1.0);
+    #ifdef GL_OES_standard_derivatives
+      gl_FragColor = vec4(color,1.0);
+    #else
+      gl_FragColor = vec4(0.0,0.0,0.0,1.0);
+    #endif
 }
