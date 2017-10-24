@@ -8,6 +8,7 @@ var triangleVertexPositionBuffer;
 
 var mouseX;
 var mouseY;
+var keyChar;
 
 var locationOfU_time;
 var timeLoad;
@@ -21,6 +22,13 @@ function mouseMove(event)
     mouseX = event.clientX;
     mouseY = event.clientY;
 }
+window.addEventListener("keydown",
+function keyboard(event)
+{
+  //keyChar = String.fromCharCode(event.keyCode);
+   keyChar = event.keyCode;
+   console.log(keyChar);
+} );
 
 //===================================================================
 //initialzes the buffers and adds the coordinates of the verts of the
@@ -100,7 +108,9 @@ function webGLStart()
       var locationOfU_resolition = gl.getUniformLocation(program, "u_resolution");
       var locationOfU_mouse = gl.getUniformLocation(program, "u_mouse");
       locationOfU_time = gl.getUniformLocation(program, "u_time");
+      var locationOfKeyChar = gl.getUniformLocation(program,"keyChar");
 
+      gl.uniform1f(locationOfKeyChar,keyChar);
       gl.uniform2f(locationOfU_resolition, gl.viewportWidth, gl.viewportHeight);
       gl.uniform2f(locationOfU_mouse, mouseX, mouseY);
       //gl.uniform1f(locationOfU_time, 0);
