@@ -343,7 +343,7 @@ vec3 navigation(vec3 eye){
   vec3 right = normalize(cross(up,eye));
   switch (keyChar) {
      case 83://S
-         eye = sub(eye, right);
+         eye = sub(eye, forward);
          initProjection(height, width);
         break;
      case 68://D
@@ -355,9 +355,17 @@ vec3 navigation(vec3 eye){
        initProjection(height, width);
         break;
      case 65://A
-       eye = add(eye, up);
+       eye = sub(eye, right);
        initProjection(height, width);
          break;
+      /*Arrow Keys
+      case 40: down
+      case 39: right
+      case 38: up
+      case 37: left
+      find phi and theta from trig on the up vecor vs eye?
+
+      */
        }
     return eye;
 }
