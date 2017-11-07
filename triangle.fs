@@ -348,6 +348,8 @@ void main() {
     //the next line finds the relationship between the normal of the point
     //and the light direction
     //max keeps the value zero if it's negative
+    
+    vec3 color = (1.0 - noHit)*background + (noHit*lightingColor);
 
     //cell shading
     //color = floor(color * 8.0)/8.0;
