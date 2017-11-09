@@ -58,19 +58,30 @@ float sdSphere( vec3 p, float s )
   return length(p)-s;
 }
 
-
+/*
+    primitive for creating a box. The dimensions are reflected from the 1st
+    quadrant to create the box.
+*/
 float sdBox( vec3 p, vec3 b )
 {
   vec3 d = abs(p) - b;
   return min(max(d.x,max(d.y,d.z)),0.0) + length(max(d,vec3(0.0)));
 }
 
+/*
+    primite for creating a torus. The first parameter is the position and the
+    2nd controls the size of the torus and the inner circle.
+*/
 float sdTorus( vec3 p, vec2 t )
 {
   vec2 q = vec2(length(p.xz)-t.x,p.y);
   return length(q)-t.y;
 }
 
+/*
+    function for twisting specifically the torus. Increasing or decreasing the
+    number inside the cos and sin will increase or decrease the amount of twist.
+*/
 float opTwistTorus( vec3 p )
 {
     float c = cos(2.0*p.y);
@@ -80,10 +91,18 @@ float opTwistTorus( vec3 p )
     return sdTorus(q , vec2(1.0,0.25));
 }
 
+/*
+    function for dispalcing pixels inside a primitve. This is called in
+    sphereDisplace to change the sphere.
+*/
 float displacement(vec3 p){
   return sin(10.0*p.x)*sin(10.0*p.y)*sin(10.0*p.z);
 }
 
+/*
+    function for displacing pixels of the sphere primitive. Can be called the
+    same way the sdSphere function is called.
+*/
 float sphereDisplace( vec3 p, float s )
 {
     float d1 = sdSphere(p, s);
@@ -91,20 +110,18 @@ float sphereDisplace( vec3 p, float s )
     return d1+d2;
 }
 
-
+/*
+    function for unioning two objects in the scene.
+*/
 float un(float d1, float d2) {
     return min(d1,d2);
 }
 
 float sceneSDF(vec3 pt) {
-
-
-
     float floor = sdBox(pt-vec3(0,-1.7,0), vec3(30,0.0,20.0));
     float sphere = sdSphere(pt-vec3(sin(u_time),-0.5+(sin(u_time)*0.3),cos(u_time)), 0.5);
     float mirrorSphere = sdSphere(pt-vec3(2.811,1.0+(sin(u_time)*0.3),-3.0), 2.0);
     float mirrorCube = sdBox(pt-vec3(-3.5,0.869,-1.712), vec3(1.0,6.0,2.0));
-    //float mirrorTorus = sdTorus(pt-vec3(0,0.5,0.0),vec2(12.0,1.5));
     float twistTorus = opTwistTorus(pt- vec3(-1.5,0.5,-4.0));
     float dispSphere = sphereDisplace(pt - vec3(3.0, 3.0, 3.0), 2.0);
 
@@ -119,8 +136,8 @@ float sceneSDF(vec3 pt) {
         ray.hit = 2;
     }
 
-    return value;// + sdSphere(pt, 1.0);//sdBox(pt, vec3(1.0,-1.0,1.0));// + sphereAtPos(pt, vec3(0.0,2.0,0.0));
-}
+    return value;
+  }
 
 /*
     key function of the raymarch
@@ -170,13 +187,13 @@ vec3 estimateNormal(vec3 p) {
         sceneSDF(vec3(p.x, p.y, p.z  + EPSILON)) - sceneSDF(vec3(p.x, p.y, p.z - EPSILON))
     ));
 }
-//lighting start
+//Calculates the diffused portion of the lighting
 vec3 diffuseLighting(vec3 pt, light currentLight, vec3 normal) {
     vec3 lightDir = normalize(currentLight.pos-pt);
     float lDotn = dot(lightDir, normal);
     return (currentLight.diffuseColor * max(lDotn,0.0) * currentLight.intensity);
 }
-
+//Calculates the specular portion of the lighting
 vec3 specularLighting(vec3 pt, vec3 normal, vec3 eye, light currentLight) {
     float shinyness = 8.0;
     vec3 l = normalize(currentLight.pos - pt);
@@ -190,7 +207,7 @@ float filterWidth(vec2 uv) {
   vec2 fw = max(abs(dFdx(uv)),abs(dFdy(uv)));
   return max(fw.x, fw.y);
 }
-
+//Creates the checkerboard pattern for the box acting as the floor
 vec3 floorCheckerboard(vec3 pt) {
     vec3 color = vec3(0.981,0.985,0.995);
 
@@ -200,7 +217,7 @@ vec3 floorCheckerboard(vec3 pt) {
     }
     return color * (1.0 - tile);
 }
-
+//Alternate way of creating the checkerboard pattern for the floor
 vec3 floorCheckerboard2(vec2 uv){
   float width = filterWidth(uv);
   vec2 p0 = uv - 0.5 * width;
@@ -210,7 +227,8 @@ vec3 floorCheckerboard2(vec2 uv){
   float p = i.x * i.y + (1.0 - i.x) * (1.0 - i.y);
   return vec3(0.1+ 0.9 * p);
 }
-
+//Marches from the light to objects to see what parts of the scene should be in
+//a shadow.
 bool shadow(vec3 pt, light currentLight) {
 
     float dist = shortestDistanceToSurface(pt, normalize(currentLight.pos - pt), MIN_DIST+ 0.01, length(currentLight.pos - pt));
@@ -224,7 +242,7 @@ bool shadow(vec3 pt, light currentLight) {
 
     return  hit;
 }
-
+//Calls the other lighting functions to put together the full lighting display
 vec3 lighting(vec3 pt, vec3 eye, light currentLight, vec3 objectColor) {
     vec3 ambientLight = currentLight.ambientColor;
     vec3 normal = estimateNormal(pt);
@@ -234,7 +252,6 @@ vec3 lighting(vec3 pt, vec3 eye, light currentLight, vec3 objectColor) {
 
     bool shadow = shadow(pt, currentLight);
 
-    //vec3 ptColor = (ambientLight + (diffuse + specular * float(!shadow)) + (float(shadow) * vec3(-0.2, -0.8, -0.8))) * objectColor;
     vec3 ptColor = (ambientLight + diffuse + specular) * objectColor;
 
 
@@ -244,10 +261,9 @@ vec3 lighting(vec3 pt, vec3 eye, light currentLight, vec3 objectColor) {
 
     return ptColor;
 }
-
+//Checks a color at a specific pixel
 vec3 getObjectColor(vec3 pt) {
     vec3 sphereColor = vec3(0.830,0.164,0.276);
-    //vec3 floorColor = floorCheckerboard(pt);
     vec3 floorColor = floorCheckerboard2(vec2(pt.x,pt.z));
     vec3 objectColor;
     if (ray.hit == 0) {
@@ -258,7 +274,8 @@ vec3 getObjectColor(vec3 pt) {
 
     return objectColor;
 }
-
+//Creates a mirror effect by checking the color of the point reflecting from
+//one pixel out to another
 vec3 mirror(vec3 pt, vec3 eye, light currentLight) {
     vec3 objectColor, normal, v, reflectedV, ogpt;
     float dist, noHit;
@@ -288,7 +305,7 @@ vec3 mirror(vec3 pt, vec3 eye, light currentLight) {
 
     return lighting(ogpt, eye, currentLight, reflectionColor);
 }
-
+//Sets what type of lighting an object/pixel should have
 vec3 lightingStyle(vec3 pt, vec3 eye, light currentLight) {
     vec3 color;
     vec3 objectColor = getObjectColor(pt);
@@ -306,8 +323,7 @@ vec3 lightingStyle(vec3 pt, vec3 eye, light currentLight) {
 
 //lighting end
 
-//just testing git bruh
-
+//Sets up the camera
 mat3 setCamera(vec3 eye, vec3 center, float rotation) {
     vec3 forward = normalize(center - eye);
     vec3 orientation = vec3(sin(rotation),cos(rotation), 0.0);
@@ -348,7 +364,6 @@ void main() {
     //the next line finds the relationship between the normal of the point
     //and the light direction
     //max keeps the value zero if it's negative
-    
     vec3 color = (1.0 - noHit)*background + (noHit*lightingColor);
 
     //cell shading
