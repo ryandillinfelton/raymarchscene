@@ -11,14 +11,9 @@ var mouseY;
 var keyChar;
 var eye;
 var at;
-var p ;
-var r;
-var rtod;
+var dtor;
 var theta;
 var phi;
-var x;
-var y;
-var z;
 
 var locationOfU_time;
 var locationOfEye;
@@ -36,14 +31,18 @@ function mouseMove(event)
 }
 function setUp(){
    eye = vec3(0.0,3.0,15.0);
-   at = vec3(0.1,2.7,0.0);
+   at = vec3(0.0,0.0,0.0);
    p = subtract(at,eye);
-   rtod = Math.PI / 180;
-   theta = Math.acos(eye[1]/p[1]*rtod);
-   console.log(theta);
-   var phiInternal = rtod * (eye[0]/p[0]);
-   phi = Math.PI+1;
+   dtor = Math.PI / 180;
+   phi = Math.atan(p[1]/p[2]);
    console.log(phi);
+   if (p[0] != 0.0)
+      theta = Math.asin(eye[0]/(p[0]*Math.sin(phi)));
+   else if (p[2] != 0.0)
+      theta = Math.asin(eye[2]/(p[2]*Math.cos(phi)));
+   else
+      theta = 0;
+   console.log(theta);
 }
 window.addEventListener("keydown",
 function keyboard(event)
@@ -54,7 +53,6 @@ function keyboard(event)
    var forward = normalize(subtract(at,eye));
    var orientation = vec3(Math.sin(0.0),Math.cos(0.0), 0.0);
    var right = normalize(cross(forward,orientation));
-   var up = normalize(cross(right, forward));
    var left = normalize(cross(orientation,forward));
    if (keyChar == 83) {//S
         eye = subtract(eye,forward);
@@ -69,46 +67,47 @@ function keyboard(event)
         eye = add(eye,left);
         at = add(at,left);
    } else if (keyChar == 40) {//down
-        phi -=  Math.PI ;
-        phiChange(phi,theta,-1);
+        phi--;
+        if(phi<=0)
+          phi += 360;
+        x = Math.sin(phi*dtor)*Math.sin(theta*dtor);
+        y = Math.cos(phi*dtor);
+        z = Math.sin(phi*dtor)*Math.cos(theta*dtor);
+        p = vec3(x,y,z);
         at = add(eye,p);
    } else if (keyChar == 39) {//right
-        theta -= Math.PI ;
-        thetaChange(phi,theta,1);
+        theta--;
+        if(theta<=0)
+          theta += 360;
+        x = Math.sin(phi*dtor)*Math.sin(theta*dtor);
+        y = Math.cos(phi*dtor);
+        z = Math.sin(phi*dtor)*Math.cos(theta*dtor);
+        p = vec3(x,y,z);
         at = add(eye,p);
    } else if (keyChar == 38) {//up
-        phi +=  Math.PI ;
-        phiChange(phi,theta,1);
+        phi++;
+        if(phi>=360)
+          phi -= 360;
+        x = Math.sin(phi*dtor)*Math.sin(theta*dtor);
+        y = Math.cos(phi*dtor);
+        z = Math.sin(phi*dtor)*Math.cos(theta*dtor);
+        p = vec3(x,y,z);
         at = add(eye,p);
    } else if (keyChar == 37) {//left
-        theta += Math.PI
-        thetaChange(phi,theta,-1);
+        theta++;
+        if(theta>=360)
+          theta -= 360;
+        x = Math.sin(phi*dtor)*Math.sin(theta*dtor);
+        y = Math.cos(phi*dtor);
+        z = Math.sin(phi*dtor)*Math.cos(theta*dtor);
+        p = vec3(x,y,z);
         at = add(eye,p);
    }
-   /*console.log("phi: " + phi);
+   console.log("phi: " + phi);
    console.log("theta: " +theta);
    console.log("at: " + at);
-   console.log("eye: " + eye);*/
+   console.log("eye: " + eye);
 } );
-
-function phiChange(phi,theta,sign){
-  x = Math.sin(phi*rtod)*Math.sin(theta*rtod);
-  y = Math.cos(phi*rtod);
-  z = Math.sin(phi*rtod)*Math.cos(theta*rtod);
-  if(sign==1){
-    p = add(p,vec3(x,y,z));
-  } else { p = subtract(p,vec3(x,y,z));}
-}
-
-function thetaChange(phi,theta,sign){
-  theta = theta%40;
-  x = 5*Math.sin(phi*rtod)*Math.cos(theta*rtod);
-  y = Math.cos(phi*rtod);
-  z = 5*Math.sin(phi*rtod)*Math.sin(theta*rtod);
-  if(sign==1){
-    p = add(p,vec3(x,0,z));
-  } else { p = subtract(p,vec3(x,0,z));}
-}
 
 
 //===================================================================
