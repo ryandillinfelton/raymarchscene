@@ -47,20 +47,14 @@ vec3 background = vec3(0.75,0.8,0.95);
     Checks if the point is inside or outside of
     a unit sphere centered at the origin
 */
-
-/*
-    is the pt inside or outside of any object in the scene
-    currently only checking one sphere
-*/
-
 float sdSphere( vec3 p, float s )
 {
   return length(p)-s;
 }
 
 /*
-    primitive for creating a box. The dimensions are reflected from the 1st
-    quadrant to create the box.
+    Checks if the point is inside or outside of
+    a unit box of defined dimensions centered at the origin
 */
 float sdBox( vec3 p, vec3 b )
 {
@@ -68,20 +62,12 @@ float sdBox( vec3 p, vec3 b )
   return min(max(d.x,max(d.y,d.z)),0.0) + length(max(d,vec3(0.0)));
 }
 
-/*
-    primite for creating a torus. The first parameter is the position and the
-    2nd controls the size of the torus and the inner circle.
-*/
 float sdTorus( vec3 p, vec2 t )
 {
   vec2 q = vec2(length(p.xz)-t.x,p.y);
   return length(q)-t.y;
 }
 
-/*
-    function for twisting specifically the torus. Increasing or decreasing the
-    number inside the cos and sin will increase or decrease the amount of twist.
-*/
 float opTwistTorus( vec3 p )
 {
     float c = cos(2.0*p.y);
@@ -91,18 +77,10 @@ float opTwistTorus( vec3 p )
     return sdTorus(q , vec2(1.0,0.25));
 }
 
-/*
-    function for dispalcing pixels inside a primitve. This is called in
-    sphereDisplace to change the sphere.
-*/
 float displacement(vec3 p){
   return sin(10.0*p.x)*sin(10.0*p.y)*sin(10.0*p.z);
 }
 
-/*
-    function for displacing pixels of the sphere primitive. Can be called the
-    same way the sdSphere function is called.
-*/
 float sphereDisplace( vec3 p, float s )
 {
     float d1 = sdSphere(p, s);
@@ -110,34 +88,41 @@ float sphereDisplace( vec3 p, float s )
     return d1+d2;
 }
 
-/*
-    function for unioning two objects in the scene.
-*/
+
+//Union two primitives together
 float un(float d1, float d2) {
     return min(d1,d2);
 }
 
+/*
+Define all of the objects in the scene
+*/
 float sceneSDF(vec3 pt) {
+
+
+    //define the objects and their positions
     float floor = sdBox(pt-vec3(0,-1.7,0), vec3(30,0.0,20.0));
     float sphere = sdSphere(pt-vec3(sin(u_time),-0.5+(sin(u_time)*0.3),cos(u_time)), 0.5);
     float mirrorSphere = sdSphere(pt-vec3(2.811,1.0+(sin(u_time)*0.3),-3.0), 2.0);
     float mirrorCube = sdBox(pt-vec3(-3.5,0.869,-1.712), vec3(1.0,6.0,2.0));
+    //float mirrorTorus = sdTorus(pt-vec3(0,0.5,0.0),vec2(12.0,1.5));
     float twistTorus = opTwistTorus(pt- vec3(-1.5,0.5,-4.0));
     float dispSphere = sphereDisplace(pt - vec3(3.0, 3.0, 3.0), 2.0);
 
-
+    //find which of the objects it hit
     float value = un(un(un(un(floor, sphere),un(mirrorCube, mirrorSphere)),twistTorus),dispSphere);
 
+    //change the ray hit to match the object it hit and what it should be like
     if(value == floor) {
-        ray.hit = 0;
+        ray.hit = 0; //checkerboard
     } else if (value == sphere || value == twistTorus || value == dispSphere) {
-        ray.hit = 1;
+        ray.hit = 1; //red
     } else if (value == mirrorCube || value == mirrorSphere) {
-        ray.hit = 2;
+        ray.hit = 2; //mirror
     }
 
-    return value;
-  }
+    return value;// + sdSphere(pt, 1.0);//sdBox(pt, vec3(1.0,-1.0,1.0));// + sphereAtPos(pt, vec3(0.0,2.0,0.0));
+}
 
 /*
     key function of the raymarch
@@ -180,6 +165,8 @@ vec3 rayDirection(float fieldOfView, vec2 size, vec2 fragCoord) {
     return normalize(vec3(xy,-z));
 }
 
+
+//estimates the normal of a point on the surface of an object
 vec3 estimateNormal(vec3 p) {
     return normalize(vec3(
         sceneSDF(vec3(p.x + EPSILON, p.y, p.z)) - sceneSDF(vec3(p.x - EPSILON, p.y, p.z)),
@@ -187,13 +174,17 @@ vec3 estimateNormal(vec3 p) {
         sceneSDF(vec3(p.x, p.y, p.z  + EPSILON)) - sceneSDF(vec3(p.x, p.y, p.z - EPSILON))
     ));
 }
-//Calculates the diffused portion of the lighting
+
+//lighting start
+
+//handles diffuse lighting 
 vec3 diffuseLighting(vec3 pt, light currentLight, vec3 normal) {
     vec3 lightDir = normalize(currentLight.pos-pt);
     float lDotn = dot(lightDir, normal);
     return (currentLight.diffuseColor * max(lDotn,0.0) * currentLight.intensity);
 }
-//Calculates the specular portion of the lighting
+
+//handles specular lighting 
 vec3 specularLighting(vec3 pt, vec3 normal, vec3 eye, light currentLight) {
     float shinyness = 8.0;
     vec3 l = normalize(currentLight.pos - pt);
@@ -203,11 +194,13 @@ vec3 specularLighting(vec3 pt, vec3 normal, vec3 eye, light currentLight) {
     return (currentLight.specularColor * currentLight.intensity * pow(rdotV, shinyness));
 }
 
+//used to do texture filtering on the checkerboard floor
 float filterWidth(vec2 uv) {
   vec2 fw = max(abs(dFdx(uv)),abs(dFdy(uv)));
   return max(fw.x, fw.y);
 }
-//Creates the checkerboard pattern for the box acting as the floor
+
+//creates a checkerboard pattern on a surface relative to the (x,z) plane
 vec3 floorCheckerboard(vec3 pt) {
     vec3 color = vec3(0.981,0.985,0.995);
 
@@ -217,7 +210,9 @@ vec3 floorCheckerboard(vec3 pt) {
     }
     return color * (1.0 - tile);
 }
-//Alternate way of creating the checkerboard pattern for the floor
+
+//creates a checkerboard pattern on a surface relative to the (x,z) plane with texture filtering
+
 vec3 floorCheckerboard2(vec2 uv){
   float width = filterWidth(uv);
   vec2 p0 = uv - 0.5 * width;
@@ -227,8 +222,8 @@ vec3 floorCheckerboard2(vec2 uv){
   float p = i.x * i.y + (1.0 - i.x) * (1.0 - i.y);
   return vec3(0.1+ 0.9 * p);
 }
-//Marches from the light to objects to see what parts of the scene should be in
-//a shadow.
+
+//checks if something in between the point and a light to see if it's in shadow
 bool shadow(vec3 pt, light currentLight) {
 
     float dist = shortestDistanceToSurface(pt, normalize(currentLight.pos - pt), MIN_DIST+ 0.01, length(currentLight.pos - pt));
@@ -242,7 +237,7 @@ bool shadow(vec3 pt, light currentLight) {
 
     return  hit;
 }
-//Calls the other lighting functions to put together the full lighting display
+
 vec3 lighting(vec3 pt, vec3 eye, light currentLight, vec3 objectColor) {
     vec3 ambientLight = currentLight.ambientColor;
     vec3 normal = estimateNormal(pt);
@@ -252,18 +247,22 @@ vec3 lighting(vec3 pt, vec3 eye, light currentLight, vec3 objectColor) {
 
     bool shadow = shadow(pt, currentLight);
 
+    //combine all of the computed values to find the color of the point on the object
     vec3 ptColor = (ambientLight + diffuse + specular) * objectColor;
 
 
     if (shadow) {
+        //add in shadow if the object is in shadow
         ptColor = (float(shadow) * vec3(-0.1, -0.1, -0.1) + ambientLight) * objectColor;
     }
 
     return ptColor;
 }
-//Checks a color at a specific pixel
+
+//get the main color of the object
 vec3 getObjectColor(vec3 pt) {
     vec3 sphereColor = vec3(0.830,0.164,0.276);
+    //vec3 floorColor = floorCheckerboard(pt);
     vec3 floorColor = floorCheckerboard2(vec2(pt.x,pt.z));
     vec3 objectColor;
     if (ray.hit == 0) {
@@ -274,8 +273,8 @@ vec3 getObjectColor(vec3 pt) {
 
     return objectColor;
 }
-//Creates a mirror effect by checking the color of the point reflecting from
-//one pixel out to another
+
+//bounce a ray off of the surface and find the color of what the surface is reflecting
 vec3 mirror(vec3 pt, vec3 eye, light currentLight) {
     vec3 objectColor, normal, v, reflectedV, ogpt;
     float dist, noHit;
@@ -305,12 +304,15 @@ vec3 mirror(vec3 pt, vec3 eye, light currentLight) {
 
     return lighting(ogpt, eye, currentLight, reflectionColor);
 }
-//Sets what type of lighting an object/pixel should have
+
+//decide what method needs to be used to render the point
+//mainly just used to decide whether to use the mirror function or
+//light it like a normal surface
 vec3 lightingStyle(vec3 pt, vec3 eye, light currentLight) {
     vec3 color;
     vec3 objectColor = getObjectColor(pt);
 
-
+    //0 is normal lighting 1 is mirrored
     if (ray.hit == 0 || ray.hit == 1) {
         color = lighting(pt, eye, currentLight, objectColor);
     } else if (ray.hit == 2) {
@@ -323,7 +325,7 @@ vec3 lightingStyle(vec3 pt, vec3 eye, light currentLight) {
 
 //lighting end
 
-//Sets up the camera
+//sets up the camera in a specific position facing towards the specified eye
 mat3 setCamera(vec3 eye, vec3 center, float rotation) {
     vec3 forward = normalize(center - eye);
     vec3 orientation = vec3(sin(rotation),cos(rotation), 0.0);
@@ -364,10 +366,10 @@ void main() {
     //the next line finds the relationship between the normal of the point
     //and the light direction
     //max keeps the value zero if it's negative
+    
     vec3 color = (1.0 - noHit)*background + (noHit*lightingColor);
 
-    //cell shading
-    //color = floor(color * 8.0)/8.0;
+
     #ifdef GL_OES_standard_derivatives
       gl_FragColor = vec4(color,1.0);
     #else
